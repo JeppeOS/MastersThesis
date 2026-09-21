@@ -82,43 +82,46 @@ At the end, the Flye-assembly-derived SemiBin2-bins were of the highest quality 
 
 10.2_QC_barcode15_mapping_identity.sh: summarizes the empirical alignment-identity distribution and reports the number and fraction of alignments retained at several identity thresholds. Showed that 53% of primary alignments exceeded 97% identity. Also based on the fact that this was data from an enrichment where methylococcales may be closely related, 97% was chosen to able to tell these apart.
 
-11: ANI-based duplicate MAG assessment
-11_check_semibin2_duplicate_MAG_ANI.sh: Uses pairwise genome similarity to investigate apparently duplicated or closely related Methylococcales MAGs. Distinguishes closely related strains and genuinely distict MAGs.
+11: Calculate absolute MAG coverage
+11_calculate_semibin2_MAG_coverage.py: Combines contig depth and bin membership to calculate coverage values for individual SemiBin2 MAGs. These coverage values provide an approximate measure of MAG abundance within each metagenomic sample.
 
-12: Bandage preparation
-12_prepare_Methylococcales_Bandage.py: Prepares the recovered Methylococcales MAGs and their corresponding assembly information for visualization in Bandage.
+12: ANI-based duplicate MAG assessment
+12_check_semibin2_duplicate_MAG_ANI.sh: Uses pairwise genome similarity to investigate apparently duplicated or closely related Methylococcales MAGs. Distinguishes closely related strains and genuinely distict MAGs.
 
-13: Visualize SemiBin2 MAG coverage vs Sylph abundance
-13_plot_semibin2_MAG_coverage_vs_Sylph.R: Plots mapping-derived MAG coverage with abundance estimated independently using Sylph.
+13: Bandage preparation
+13_prepare_Methylococcales_Bandage.py: Prepares the recovered Methylococcales MAGs and their corresponding assembly information for visualization in Bandage.
 
-14: Freeze final Methylococcales MAG set
-14_freeze_semibin2_Methylococcales.py: Creates the definitive frozen set of Methylococcales MAGs used in downstream biological analyses
+14: Visualize SemiBin2 MAG coverage vs Sylph abundance
+14_plot_semibin2_MAG_coverage_vs_Sylph.R: Plots mapping-derived MAG coverage with abundance estimated independently using Sylph.
 
-15: Prepare SemiBin2 functional-analysis inputs
-15_prepare_semibin2_functional_inputs.py: Creates standardized input files and manifests required by FeGenie and the subsequent protein-level analyses.
+15: Freeze final Methylococcales MAG set
+15_freeze_semibin2_Methylococcales.py: Creates the definitive frozen set of Methylococcales MAGs used in downstream biological analyses
+
+16: Prepare SemiBin2 functional-analysis inputs
+16_prepare_semibin2_functional_inputs.py: Creates standardized input files and manifests required by FeGenie and the subsequent protein-level analyses.
 
 
 Here starts there comparative genomics part, where the workflow is very similar to that of the globdb genome analysis.
 
-16: FeGenie functional annotation
-16_run_semibin2_fegenie_full.sbatch: Runs FeGenie on the final SemiBin2 MAG collection.
+17: FeGenie functional annotation
+17_run_semibin2_fegenie_full.sbatch: Runs FeGenie on the final SemiBin2 MAG collection.
 
-17: Functional screening of unbinned contigs
-17.1_extract_semibin2_unbinned_contigs.py: Identifies assembly contigs that were not assigned to any SemiBin2 MAG.
+18: Functional screening of unbinned contigs
+18.1_extract_semibin2_unbinned_contigs.py: Identifies assembly contigs that were not assigned to any SemiBin2 MAG.
 
-17.2__run_unbinned_fegenie_full.sbatch: Runs FeGenie on the unbinned contig collection.
+18.2_run_unbinned_fegenie_full.sbatch: Runs FeGenie on the unbinned contig collection.
 
-18: SignalP6 annotation
-18_run_semibin2_signalp6_array.sbatch: Runs SignalP 6 on the final SemiBin2 MAG protein predictions.
+19: SignalP6 annotation
+19_run_semibin2_signalp6_array.sbatch: Runs SignalP 6 on the final SemiBin2 MAG protein predictions.
 
-19: FindMeHemes annotation
-19_run_semibin2_findmehemes.sbatch: Runs FindMeHemes on the SemiBin2 MAG proteomes.
+20: FindMeHemes annotation
+20_run_semibin2_findmehemes.sbatch: Runs FindMeHemes on the SemiBin2 MAG proteomes.
 
-20: Finalize the SemiBin2 FeGenie run
-20_finalize_semibin2_fegenie_run.py: Links FeGenie-generated protein files back to the authoritative SemiBin2 MAG manifest and constructs a stable protein-level dataset for downstream analyses.
+21: Finalize the SemiBin2 FeGenie run
+21_finalize_semibin2_fegenie_run.py: Links FeGenie-generated protein files back to the authoritative SemiBin2 MAG manifest and constructs a stable protein-level dataset for downstream analyses.
 
-21: Prepare DeepTMHMM candidates
-21_prepare_semibin2_deeptmhmm_candidates.py: Combines the FeGenie, SignalP and FindMeHemes results and constructs the candidate protein population submitted to DeepTMHMM.
+22: Prepare DeepTMHMM candidates
+22_prepare_semibin2_deeptmhmm_candidates.py: Combines the FeGenie, SignalP and FindMeHemes results and constructs the candidate protein population submitted to DeepTMHMM.
 
-22: DeepTMHMM annotation
+23: DeepTMHMM annotation
 22_run_semibin2_deeptmhmm_array.sbatch: Runs DeepTMHMM on the selected SemiBin2 candidate proteins.
