@@ -124,4 +124,4 @@ Here starts there comparative genomics part, where the workflow is very similar 
 22_prepare_semibin2_deeptmhmm_candidates.py: Combines the FeGenie, SignalP and FindMeHemes results and constructs the candidate protein population submitted to DeepTMHMM.
 
 23: DeepTMHMM annotation
-22_run_semibin2_deeptmhmm_array.sbatch: Runs DeepTMHMM on the selected SemiBin2 candidate proteins.
+23_run_semibin2_deeptmhmm_array.sbatch: Runs DeepTMHMM on the selected SemiBin2 candidate proteins.
