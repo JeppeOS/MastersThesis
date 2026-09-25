@@ -1,0 +1,863 @@
+---
+title: "16S rRNA Amplicon Analysis — Jeppe-Bac (MiSeq i100)"
+author: "Justus Nweze"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    number_sections: true
+    code_folding: show
+    df_print: paged
+    theme: flatly
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE, message = FALSE, warning = FALSE,
+  fig.width = 8, fig.height = 5,
+  cache = TRUE,          # expensive steps (learnErrors/dada/assignTaxonomy) cached
+  cache.lazy = FALSE
+)
+```
+
+# Overview
+
+Denoising pipeline (DADA2 → phyloseq) for the **Jeppe-Bac** run: 26 paired-end
+samples (JOS-Bac1..26), bacterial V3–V4 (Bac341F/805R), sequenced on a
+**MiSeq i100**.
+
+Because the i100 uses **XLEAP-SBS 2-colour chemistry** with **RTA4 binned
+Q-scores**, three settings differ from a classic MiSeq pipeline:
+
+1. **No `truncLen`** — quality stays high to the read end; use `minLen`.
+2. **`rm.lowcomplex`** — 2-colour chemistry can miscall no-signal as high-Q
+   "G", creating poly-G runs that distort the error model.
+3. **Binned error model** — `makeBinnedQualErrfun()` instead of the default.
+
+*(Source: `MiSeqi100_dada2_error_correction.pdf`.)*
+
+```{r packages}
+rm(list = ls())
+
+setwd("C:/Users/jeppe/Desktop/Bioinf/MiSeq_8_7")
+## Packages ##
+library(BiocParallel)
+
+## Force Bioconductor functions to run serially on Windows ##
+BiocParallel::register(BiocParallel::SerialParam(), default = TRUE)
+options(mc.cores = 1)
+
+library(dada2)
+library(phyloseq)
+library(Biostrings)
+library(ggplot2)
+library(dplyr)
+
+## Confirm ##
+BiocParallel::bpparam()
+
+```
+
+# Paths and file names
+
+```{r paths}
+
+# the 52 .fastq.gz live here
+path <- file.path("cutadapt_arch")
+filt.dir <- file.path("filtered_arch")
+out.dir  <- file.path("results_arch")
+fig.dir  <- file.path("figures_arch")    # all plots exported here as PNG
+dir.create(filt.dir, showWarnings = FALSE, recursive = TRUE)
+dir.create(out.dir, showWarnings = FALSE, recursive = TRUE)
+dir.create(fig.dir, showWarnings = FALSE, recursive = TRUE)
+
+# Helper: display a ggplot AND save it to figures/ (300 dpi).
+# Works both interactively (console) and when knitting.
+save_fig <- function(p, name, w = 8, h = 5) {
+  ggsave(file.path(fig.dir, name), plot = p, width = w, height = h,
+         dpi = 300, bg = "white")
+  p   # return so it also prints
+}
+
+fnFs <- sort(list.files(path, pattern = "_R1.fastq.gz", full.names = TRUE))
+fnRs <- sort(list.files(path, pattern = "_R2.fastq.gz", full.names = TRUE))
+# Sample name = Bac#_S###  (drop "JOS-" prefix, join the Bac token + S token)
+# e.g. "JOS-Bac1_S146_L001_R1_001.fastq.gz" -> "Bac1_S146"  (matches metadata.csv)
+parts <- strsplit(basename(fnFs), "_")
+sample.names <- sapply(parts, function(x) paste0(sub("^JOS-", "", x[1]), "_", x[2]))
+stopifnot(length(fnFs) == length(fnRs))
+sample.names
+
+length(fnFs)
+length(fnRs)
+
+basename(fnFs)
+basename(fnRs)
+
+all(file.exists(fnFs))
+all(file.exists(fnRs))
+
+file.info(fnFs)$size
+file.info(fnRs)$size
+```
+
+# Sample display order and labels
+
+The three sample sets are kept as separate objects so they cannot overwrite one
+another. The matching set is selected automatically from the FASTQ sample names,
+and the downstream plotting code continues to use `order` and `samlabels`.
+
+```{r sample-order}
+## Sample order ##
+order_arch <- c(
+  "Arch1_S136", "Arch2_S141", "Arch3_S145",
+  "Arch13_S137", "Arch14_S138", "Arch15_S139",
+  "Arch18_S140", "Arch20_S142", "Arch21_S143"
+)
+
+order_bac <- c(
+  "Bac1_S146", "Bac2_S157", "Bac3_S165",
+  "Bac4_S166", "Bac5_S167", "Bac6_S168",
+  "Bac7_S169", "Bac8_S170", "Bac9_S171",
+  "Bac10_S147", "Bac11_S148", "Bac12_S149",
+  "Bac13_S150", "Bac14_S151", "Bac15_S152",
+  "Bac16_S153", "Bac17_S154", "Bac18_S155",
+  "Bac19_S156", "Bac20_S158", "Bac21_S159"
+)
+
+order_fh <- c(
+  "JO-Bac1_S69", "JO-Bac2_S70", "JO-Bac3_S71",
+  "JO-Bac4_S72", "JO-Bac5_S73", "JO-Bac6_S74",
+  "JO-Bac7_S75", "JO-Bac8_S76"
+)
+
+## Plot labels ##
+samlabels_arch <- c(
+  "Arch1_S136"  = "BRt3_1 (oxic)",
+  "Arch2_S141"  = "BRt3_2 (oxic)",
+  "Arch3_S145"  = "BRt3_3 (oxic)",
+  "Arch13_S137" = "UL_dir_1",
+  "Arch14_S138" = "UL_dir_2",
+  "Arch15_S139" = "UL_dir_3",
+  "Arch18_S140" = "UL_SAt_3",
+  "Arch20_S142" = "UL_SA_2",
+  "Arch21_S143" = "UL_SA_3"
+)
+
+samlabels_bac <- c(
+  "Bac1_S146"  = "BRt3_1 (oxic)",
+  "Bac2_S157"  = "BRt3_2 (oxic)",
+  "Bac3_S165"  = "BRt3_3 (oxic)",
+  "Bac4_S166"  = "ULt2_1 (oxic)",
+  "Bac5_S167"  = "ULt2_2 (oxic)",
+  "Bac6_S168"  = "ULt2_3 (oxic)",
+  "Bac7_S169"  = "BRt_1",
+  "Bac8_S170"  = "BRt_2",
+  "Bac9_S171"  = "BRt_3",
+  "Bac10_S147" = "UL_1",
+  "Bac11_S148" = "UL_2",
+  "Bac12_S149" = "UL_3",
+  "Bac13_S150" = "UL_dir_1",
+  "Bac14_S151" = "UL_dir_2",
+  "Bac15_S152" = "UL_dir_3",
+  "Bac16_S153" = "UL_SAt_1",
+  "Bac17_S154" = "UL_SAt_2",
+  "Bac18_S155" = "UL_SAt_3",
+  "Bac19_S156" = "UL_SA_1",
+  "Bac20_S158" = "UL_SA_2",
+  "Bac21_S159" = "UL_SA_3"
+)
+
+samlabels_fh <- c(
+  "JO-Bac1_S69" = "FH1 (oxic)",
+  "JO-Bac2_S70" = "FH2 (oxic)",
+  "JO-Bac3_S71" = "FH3 (oxic)",
+  "JO-Bac4_S72" = "FH no methane (oxic)",
+  "JO-Bac5_S73" = "FH blank (oxic)",
+  "JO-Bac6_S74" = "FH MeOH+NTA",
+  "JO-Bac7_S75" = "FH MeOH+FeOH",
+  "JO-Bac8_S76" = "FH MeOH only"
+)
+
+## Select the sample set that best matches the current FASTQ files ##
+order_sets <- list(
+  arch = order_arch,
+  bac  = order_bac,
+  fh   = order_fh
+)
+
+label_sets <- list(
+  arch = samlabels_arch,
+  bac  = samlabels_bac,
+  fh   = samlabels_fh
+)
+
+match_counts <- vapply(
+  order_sets,
+  function(x) sum(sample.names %in% x),
+  integer(1)
+)
+
+active_set <- names(which.max(match_counts))
+
+if (max(match_counts) == 0) {
+  stop("None of the predefined sample orders match the current FASTQ sample names.")
+}
+
+order <- order_sets[[active_set]]
+samlabels <- label_sets[[active_set]]
+
+## Guard against mismatched labels/order ##
+stopifnot(all(order %in% names(samlabels)))
+
+cat("Using sample order:", active_set, "\n")
+```
+
+# Read quality and complexity {.tabset}
+
+MiSeq i100 profiles look flat/high (mostly Q38) and banded (binning) — that is
+normal and is why we do not truncate.
+
+## Forward quality
+```{r qc-fwd}
+save_fig(plotQualityProfile(fnFs[1:2]), "01_arch_quality_forward.png", w = 9, h = 5)
+```
+
+## Reverse quality
+```{r qc-rev}
+save_fig(plotQualityProfile(fnRs[1:2]), "02_arch_quality_reverse.png", w = 9, h = 5)
+```
+
+## Complexity (poly-G check)
+Random sequence → ~16; poly-G → ~1. A peak near 1 means `rm.lowcomplex` (next
+step) will strip those reads.
+```{r qc-complex}
+save_fig(plotComplexity(fnFs[1:2]), "03_arch_complexity_forward.png", w = 9, h = 5)
+save_fig(plotComplexity(fnRs[1:2]), "04_arch_complexity_reverse.png", w = 9, h = 5)
+```
+
+# Filter and trim
+
+Primers (still on reads): **Bac341F** `CCTACGGGNGGCWGCAG` (17 bp) /
+**Bac805R** `GACTACHVGGGTATCTAATCC` (21 bp) → `trimLeft = c(17, 21)`.
+MiSeq i100: `minLen` instead of `truncLen`, plus `rm.lowcomplex`.
+
+```{r filter}
+filtFs <- file.path(filt.dir, paste0(sample.names, "_F_filt.fastq.gz"))
+filtRs <- file.path(filt.dir, paste0(sample.names, "_R_filt.fastq.gz"))
+names(filtFs) <- sample.names
+names(filtRs) <- sample.names
+
+out <- filterAndTrim(
+  fnFs, filtFs, fnRs, filtRs,
+  minLen = 200,
+  maxN = 0, maxEE = c(2, 2), truncQ = 2,
+  rm.phix = TRUE, rm.lowcomplex = 8,
+  compress = TRUE
+)
+out
+```
+
+> **JOS-Bac26 (S164)** is tiny (~59 KB) — almost certainly a negative control.
+> Expect very few reads; keep it here to check contamination, drop before diversity.
+
+# Error model (binned Q-scores) {.tabset}
+
+```{r errors}
+BinnedErrfun <- makeBinnedQualErrfun(c(2, 12, 24, 38))
+errF <- learnErrors(filtFs, errorEstimationFunction = BinnedErrfun)
+errR <- learnErrors(filtRs, errorEstimationFunction = BinnedErrfun)
+```
+
+## Forward errors
+```{r err-fwd}
+# flat line in the empty low-Q range is expected (no data in those bins)
+save_fig(plotErrors(errF, nominalQ = TRUE), "05_arch_errors_forward.png", w = 8, h = 7)
+```
+
+## Reverse errors
+```{r err-rev}
+save_fig(plotErrors(errR, nominalQ = TRUE), "06_arch_errors_reverse.png", w = 8, h = 7)
+```
+
+# Denoise, merge, ASV table, chimeras
+
+```{r denoise}
+dadaFs <- dada(filtFs, err = errF)
+dadaRs <- dada(filtRs, err = errR)
+
+mergers <- mergePairs(dadaFs, filtFs, dadaRs, filtRs, verbose = TRUE)
+
+seqtab <- makeSequenceTable(mergers)
+table(nchar(getSequences(seqtab)))   # merged-length distribution (V3-V4 ~400-430)
+
+seqtab.nochim <- removeBimeraDenovo(seqtab, method = "consensus", verbose = TRUE)
+cat("Dimensions (samples x ASVs):", dim(seqtab.nochim), "\n")
+cat("Fraction reads kept after chimera removal:",
+    round(sum(seqtab.nochim) / sum(seqtab), 3), "\n")
+```
+
+# Read tracking (QC)
+
+Big drops at any single step point to a parameter problem.
+
+```{r track}
+getN <- function(x) sum(getUniques(x))
+track <- cbind(out,
+  denoisedF = sapply(dadaFs, getN),
+  denoisedR = sapply(dadaRs, getN),
+  merged    = sapply(mergers, getN),
+  nonchim   = rowSums(seqtab.nochim))
+colnames(track)[1:2] <- c("input", "filtered")
+rownames(track) <- sample.names
+write.csv(track, file.path(out.dir, "read_tracking.csv"))
+track
+```
+
+# Taxonomy
+
+Taxonomy is assigned with the DADA2-formatted training FASTA specified below.
+The downstream table keeps six taxonomic ranks through genus.
+
+```{r taxonomy}
+
+## GTDB r226 bacterial representative SSU training set ##
+## Taxonomy is restricted to Domain -> Genus ##
+
+gtdb.train <- "GTDB_r226_ar53_reps_DADA2_genus_trainset.fa.gz"
+
+## Assign taxonomy ##
+taxa.out <- assignTaxonomy(
+  seqtab.nochim,
+  gtdb.train,
+  taxLevels = c(
+    "Domain",
+    "Phylum",
+    "Class",
+    "Order",
+    "Family",
+    "Genus"
+  ),
+  outputBootstraps = TRUE,
+  multithread = 4,
+  verbose = TRUE
+)
+
+## Taxonomy matrix ##
+taxa <- taxa.out$tax
+
+## Naive-Bayes bootstrap confidence (%) per rank ##
+boot <- taxa.out$boot
+colnames(boot) <- paste0(colnames(boot), " (BS)")
+
+## Inspect taxonomy ##
+taxa.print <- taxa
+rownames(taxa.print) <- NULL
+
+head(taxa.print)
+```
+
+# Save ASV outputs
+
+```{r save-asv}
+saveRDS(seqtab.nochim, file.path(out.dir, "seqtab_nochim_GTDB.rds"))
+saveRDS(taxa,          file.path(out.dir, "taxa_GTDB.rds"))
+
+asv_seqs <- colnames(seqtab.nochim)
+asv_ids  <- paste0("ASV", seq_along(asv_seqs))
+
+asv_tab <- t(seqtab.nochim)
+rownames(asv_tab) <- asv_ids
+write.csv(asv_tab, file.path(out.dir, "ASV_counts_arch_GTDB.csv"))
+
+asv_tax <- cbind(taxa, boot)
+rownames(asv_tax) <- asv_ids
+write.csv(asv_tax, file.path(out.dir, "ASV_taxonomy_arch_GTDB.csv"))
+
+fasta <- character(2 * length(asv_seqs))
+fasta[c(TRUE, FALSE)] <- paste0(">", asv_ids)
+fasta[c(FALSE, TRUE)] <- asv_seqs
+writeLines(fasta, file.path(out.dir, "ASVs_GTDB.fasta"))
+```
+
+# phyloseq object
+
+Build the phyloseq object used in the downstream analysis and attach the ASV
+sequences. Sample names are kept identical to `sample.names`.
+
+```{r phyloseq}
+## Ensure sample names are correct ##
+rownames(seqtab.nochim) <- sample.names
+
+ps <- phyloseq(
+  otu_table(seqtab.nochim, taxa_are_rows = FALSE),
+  tax_table(taxa)
+)
+
+## Add ASV sequences ##
+dna <- DNAStringSet(taxa_names(ps))
+names(dna) <- taxa_names(ps)
+ps <- merge_phyloseq(ps, dna)
+
+## Rename taxa to ASV1, ASV2, ... ##
+taxa_names(ps) <- paste0("ASV", seq_len(ntaxa(ps)))
+
+saveRDS(ps, file.path(out.dir, "phyloseq_gtdb.rds"))
+ps
+```
+
+# Community composition {.tabset}
+
+```{r clean}
+## Keep Bacteria/Archaea with assigned phylum ##
+ps <- subset_taxa(
+  ps,
+  Domain %in% c("Bacteria", "Archaea")
+)
+
+ps <- subset_taxa(
+  ps,
+  !is.na(Phylum) & !Phylum %in% c("", "NA")
+)
+
+ps <- prune_taxa(taxa_sums(ps) > 0, ps)
+
+sort(sample_sums(ps))
+```
+
+
+`rel_abund_bar()` agglomerates at the chosen rank and shows **every taxon that
+reaches `min_pct`% in at least one sample as its own named bar** — so real genera
+are never hidden inside a generic "Other". `Unassigned` (no genus in GTDB) is
+kept as its own honest category. Only the genuinely negligible tail (each taxon
+< `min_pct`%) collapses into a single grey `<min_pct%` block; each bar still sums
+to 100%.
+
+At `min_pct = 1` these 4 samples show ~13 genera. Note: past ~8 hues, colours are
+no longer all colour-blind-distinct, so identity leans on the legend + the white
+segment gaps. Lowering `min_pct` reveals more taxa but pushes colour reuse
+further (there are 101 genus-level groups here, ~87 of them < 1%).
+
+```{r relabund-fn}
+# Distinct palette for up to 16 named taxa. The first 8 are the validated
+# colour-blind-safe set; the rest extend it (less CVD-separated — lean on the
+# legend). Grey (#c4c3bb) is reserved for the "<min_pct%" remainder.
+tax_pal <- c(
+  "#1F77B4", # blue
+  "#FF7F0E", # orange
+  "#2CA02C", # green
+  "#D62728", # red
+  "#9467BD", # purple
+  "#8C564B", # brown
+  "#E377C2", # pink
+  "#7F7F7F", # gray
+  "#BCBD22", # olive
+  "#17BECF", # cyan
+  "#393B79", # navy
+  "#637939", # dark olive
+  "#8C6D31", # ochre
+  "#843C39", # dark red
+  "#7B4173", # plum
+  "#3182BD", # sky blue
+  "#31A354", # emerald
+  "#756BB1", # lavender
+  "#636363", # charcoal
+  "#E6550D", # burnt orange
+  "#969696", # light gray
+  "#6BAED6", # light blue
+  "#74C476", # light green
+  "#FD8D3C", # peach
+  "#9ECAE1", # pale blue
+  "#A1D99B", # pale green
+  "#FDD0A2", # light orange
+  "#C994C7", # lilac
+  "#BDBDBD", # silver
+  "#F768A1", # magenta
+  "#41AB5D", # forest green
+  "#08519C"  # deep blue
+)
+
+
+# Show every taxon reaching >= min_pct in ANY sample as its own bar; taxa below
+# that (each individually tiny) collapse into one "<min_pct%" block. Unassigned
+# (no genus in GTDB) is kept as its own category.
+rel_abund_bar <- function(ps, level = "Genus", min_pct = 1) {
+  rel <- transform_sample_counts(ps, function(x) x / sum(x))
+  g   <- tax_glom(rel, taxrank = level, NArm = FALSE)
+  df  <- psmelt(g)
+  df[[level]] <- as.character(df[[level]])
+  df[[level]][is.na(df[[level]])] <- "Unassigned"
+  df$Sample <- factor(df$Sample, levels = order)
+  mx   <- tapply(df$Abundance, df[[level]], max)              # peak abundance per taxon
+  keep <- names(mx)[mx >= min_pct / 100]
+  ord  <- names(sort(tapply(df$Abundance, df[[level]], mean), decreasing = TRUE))
+  keep <- ord[ord %in% keep]                                 # kept taxa, abundance-ordered
+  if (length(keep) > length(tax_pal))
+    warning(length(keep), " taxa >= min_pct but only ", length(tax_pal),
+            " palette colours; raise min_pct or extend tax_pal.")
+  rare <- paste0("<", min_pct, "%")
+  df$Taxon <- factor(ifelse(df[[level]] %in% keep, df[[level]], rare),
+                     levels = c(keep, rare))
+  df <- aggregate(Abundance ~ Sample + Taxon, df, sum)       # one block per taxon (no striping)
+  fills <- c(setNames(tax_pal[seq_along(keep)], keep), setNames("#c4c3bb", rare))
+  ggplot(df, aes(Sample, Abundance, fill = Taxon)) +
+    geom_col(width = 0.95, colour = "white", linewidth = 0.15) +
+    scale_fill_manual(values = fills) +
+    scale_x_discrete(labels = samlabels) +
+    scale_y_continuous(labels = function(x) x * 100, expand = c(0, 0)) +
+    labs(x = NULL, y = "Relative abundance (%)", fill = level) +
+    theme_bw() +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5),
+          legend.key.size = unit(0.42, "cm"), legend.text = element_text(size = 8))
+}
+```
+
+### Phylum (overview)
+```{r relabund-phylum, fig.height=6}
+save_fig(rel_abund_bar(ps, level = "Phylum", min_pct = 1),
+         "07_arch_gtdb_relabund_phylum.png", w = 7, h = 6)
+```
+
+### Genus (detail)
+```{r relabund-genus, fig.height=7}
+save_fig(rel_abund_bar(ps, level = "Genus", min_pct = 2),
+         "08_arch_gtdb_relabund_genus.png", w = 9, h = 7)
+```
+
+# Methanotroph / ANME genus subset
+
+The original script contained both an aerobic MOB list and an ANME list assigned
+to the same object. To preserve the behaviour of the original code, the aerobic
+MOB list is retained as a reference object, while `mob_genera` remains the ANME
+list that was active after the overwrite.
+
+The abundance plots below are therefore calculated from the active
+`mob_genera` list as a fraction of the whole community.
+
+```{r methanotroph-list}
+aerobic_mob_genera <- c(
+  ## Gammaproteobacteria — Methylococcales
+  "Methylicorpusculum",
+  "Methylococcus",
+  "Methylocaldum",
+  "Methylomonas",
+  "Methylobacter",
+  "Methylomicrobium",
+  "Methylotuvimicrobium",
+  "Methylosarcina",
+  "Methylosoma",
+  "Methylovulum",
+  "Methyloglobulus",
+  "Methylomarinum",
+  "Methyloprofundus",
+  "Methylotetracoccus",
+  "Methylospira",
+  "Methylomagnum",
+  "Methyloterricola",
+  "Methyloparacoccus",
+  "Methylogaea",
+  "Methylocucumis",
+  "Methylohalobius",
+  "Methylothermus",
+  "Methylumidiphilus",
+  "Crenothrix",
+  "Clonothrix",
+  "UBA4132",
+
+  ## Alphaproteobacteria — Type II
+  "Methylocystis",
+  "Methylosinus",
+  "Methylocella",
+  "Methylocapsa",
+  "Methyloferula",
+  "Methylovirgula",
+  "Methylorosula",
+
+  ## Verrucomicrobia
+  "Methylacidiphilum",
+  "Methylacidimicrobium",
+
+  ## NC10
+  "Methylomirabilis"
+)
+
+mob_regex <- paste0(
+  "^(",
+  paste(aerobic_mob_genera, collapse = "|"),
+  ")(_[A-Z0-9]+)?$"
+)
+
+```
+
+```{r methanotroph-bar, fig.height=5}
+# % of the WHOLE community: transform first, then keep MOB genera.
+rel_all <- transform_sample_counts(ps, function(x) x / sum(x))
+mob_df <- psmelt(rel_all)
+mob_df$Genus <- as.character(mob_df$Genus)
+mob_df <- mob_df[!is.na(mob_df$Genus) & grepl(mob_regex, mob_df$Genus), ]
+mob_df <- mob_df[!mob_df$Sample %in% c("Bac22_S160", "Bac23_S161", "Bac24_S162", "Bac25_S163"), ]
+mob_df$Sample <- factor(mob_df$Sample, levels = order)
+  
+ if (nrow(mob_df) == 0) {
+  message("No methanotroph genera detected in these samples.")
+} else {
+  mob_df <- aggregate(Abundance ~ Sample + Genus, mob_df, sum)  # one block per genus
+  ord <- names(sort(tapply(mob_df$Abundance, mob_df$Genus, mean), decreasing = TRUE))
+  mob_df$Genus <- factor(mob_df$Genus, levels = ord)
+  fills  <- setNames(tax_pal[seq_along(ord)], ord)
+
+  p_mob <- ggplot(mob_df, aes(Sample, Abundance, fill = Genus)) +
+    geom_col(width = 0.9, colour = "white", linewidth = 0.15) +
+    scale_fill_manual(values = fills) +
+    scale_y_continuous(labels = function(x) x * 100, expand = c(0, 0.01)) +
+    scale_x_discrete(labels = samlabels) +
+    labs(x = NULL, y = "Relative abundance (% of community)",
+         fill = "ANME genus") +
+    theme_bw() +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5),
+          legend.key.size = unit(0.42, "cm"), legend.text = element_text(size = 8))
+  save_fig(p_mob, "09_arch_gtdb_relabund_methanotrophs.png", w = 7, h = 5)
+
+  # Companion table: total methanotroph % per sample (written to results/).
+  tot <- aggregate(Abundance ~ Sample, mob_df, sum)
+  tot$Percent <- round(100 * tot$Abundance, 3)
+  write.csv(tot[, c("Sample", "Percent")],
+            file.path(out.dir, "methanotroph_total_percent.csv"), row.names = FALSE)
+  tot[, c("Sample", "Percent")]
+  
+}
+
+plot(p_mob)
+```
+
+## Within the selected methanotroph community
+
+The same active genus set, but now normalised so the selected methanotroph
+community sums to 100% within each sample.
+
+```{r methanotroph-within, fig.height=5}
+# Keep only MOB taxa, THEN transform so each sample's MOB sum to 1.
+mob_taxa <- grepl(mob_regex, as.character(tax_table(ps)[, "Genus"]))
+mob_taxa[is.na(mob_taxa)] <- FALSE
+
+if (!any(mob_taxa)) {
+  message("No methanotroph genera detected in these samples.")
+} else {
+  ps_mob <- prune_taxa(mob_taxa, ps)
+  ps_mob <- transform_sample_counts(ps_mob, function(x) x / sum(x))   # sums to 1 per sample
+  win_df <- psmelt(ps_mob)
+  win_df <- win_df[!win_df$Sample %in% c("Bac22_S160", "Bac23_S161", "Bac24_S162", "Bac25_S163"), ]
+  win_df$Sample <- factor(win_df$Sample, levels = order)
+  win_df$Genus <- as.character(win_df$Genus)
+  win_df <- aggregate(Abundance ~ Sample + Genus, win_df, sum)        # one block per genus
+  ord <- names(sort(tapply(win_df$Abundance, win_df$Genus, mean), decreasing = TRUE))
+  win_df$Genus <- factor(win_df$Genus, levels = ord)
+  fills  <- setNames(tax_pal[seq_along(ord)], ord)
+
+  p_win <- ggplot(win_df, aes(Sample, Abundance, fill = Genus)) +
+    geom_col(width = 0.9, colour = "white", linewidth = 0.15) +
+    scale_fill_manual(values = fills) +
+    scale_y_continuous(labels = function(x) x * 100, expand = c(0, 0)) +
+    scale_x_discrete(labels = samlabels) +
+    labs(x = NULL, y = "Relative abundance (% of methanotrophs)",
+         fill = "Methanotroph genus") +
+    theme_bw() +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5),
+          legend.key.size = unit(0.42, "cm"), legend.text = element_text(size = 8))
+  save_fig(p_win, "10_arch_gtdb_methanotrophs_within.png", w = 7, h = 5)
+
+  # Companion table: each genus as % of the methanotroph community (wide).
+  win_wide <- reshape(transform(win_df, Percent = round(100 * Abundance, 3))[,
+                        c("Sample", "Genus", "Percent")],
+                      idvar = "Sample", timevar = "Genus", direction = "wide")
+  names(win_wide) <- sub("^Percent\\.", "", names(win_wide))
+  write.csv(win_wide, file.path(out.dir, "methanotroph_within_percent.csv"),
+            row.names = FALSE)
+  win_wide
+}
+```
+
+```{r}
+## Named ANME genera ##
+anme_genera <- c(
+  "Methanophaga",
+  "Candidatus Methanophaga",
+  "Methanoalium",
+  "Candidatus Methanoalium",
+  "Methanoxibalbensis",
+  "Candidatus Methanoxibalbensis",
+  "Methanospirans",
+  "Candidatus Methanospirans",
+  "Methanospirare",
+  "Candidatus Methanospirare",
+  "Methanocomedens",
+  "Candidatus Methanocomedens",
+  "Methanomarinus",
+  "Candidatus Methanomarinus",
+  "Methanogaster",
+  "Candidatus Methanogaster",
+  "Methanoperedens",
+  "Candidatus Methanoperedens",
+  "Methanovorans",
+  "Candidatus Methanovorans"
+)
+
+## Exact genus matching ##
+anme_regex <- paste0(
+  "^(",
+  paste(anme_genera, collapse = "|"),
+  ")(_[A-Z0-9]+)?$"
+)
+
+## Relative abundance of whole community ##
+rel_all <- transform_sample_counts(
+  ps,
+  function(x) x / sum(x)
+)
+
+anme_df <- psmelt(rel_all)
+
+anme_df$Genus <- as.character(anme_df$Genus)
+
+anme_df <- anme_df[
+  !is.na(anme_df$Genus) &
+    grepl(anme_regex, anme_df$Genus),
+]
+
+## ---------------------------------------------------------
+## If no ANME are detected, explicitly create zero values
+## ---------------------------------------------------------
+
+if (nrow(anme_df) == 0) {
+
+  anme_plot_df <- data.frame(
+    Sample = sample_names(ps),
+    Abundance = 0
+  )
+
+  anme_plot_df$Sample <- factor(
+    anme_plot_df$Sample,
+    levels = order
+  )
+
+  p_anme <- ggplot(
+    anme_plot_df,
+    aes(x = Sample, y = Abundance)
+  ) +
+    geom_col(
+      width = 0.9,
+      fill = "grey70",
+      colour = "white",
+      linewidth = 0.15
+    ) +
+    scale_y_continuous(
+      labels = function(x) x * 100,
+      limits = c(0, 0.01),
+      expand = c(0, 0)
+    ) +
+    scale_x_discrete(labels = samlabels) +
+    labs(
+      x = NULL,
+      y = "ANME relative abundance (% of community)",
+      title = "Anaerobic methanotrophic archaea",
+      subtitle = "No ANME detected"
+    ) +
+    theme_bw() +
+    theme(
+      axis.text.x = element_text(
+        angle = 90,
+        hjust = 1,
+        vjust = 0.5
+      )
+    )
+
+} else {
+
+  ## Normal plotting when ANME are present ##
+  anme_df <- aggregate(
+    Abundance ~ Sample + Genus,
+    anme_df,
+    sum
+  )
+
+  anme_df$Sample <- factor(
+    anme_df$Sample,
+    levels = order
+  )
+
+  ord <- names(
+    sort(
+      tapply(
+        anme_df$Abundance,
+        anme_df$Genus,
+        mean
+      ),
+      decreasing = TRUE
+    )
+  )
+
+  anme_df$Genus <- factor(
+    anme_df$Genus,
+    levels = ord
+  )
+
+  fills <- setNames(
+    tax_pal[seq_along(ord)],
+    ord
+  )
+
+  p_anme <- ggplot(
+    anme_df,
+    aes(
+      Sample,
+      Abundance,
+      fill = Genus
+    )
+  ) +
+    geom_col(
+      width = 0.9,
+      colour = "white",
+      linewidth = 0.15
+    ) +
+    scale_fill_manual(values = fills) +
+    scale_y_continuous(
+      labels = function(x) x * 100,
+      expand = c(0, 0.01)
+    ) +
+    scale_x_discrete(labels = samlabels) +
+    labs(
+      x = NULL,
+      y = "ANME relative abundance (% of community)",
+      fill = "ANME genus"
+    ) +
+    theme_bw() +
+    theme(
+      axis.text.x = element_text(
+        angle = 90,
+        hjust = 1,
+        vjust = 0.5
+      ),
+      legend.key.size = unit(0.42, "cm"),
+      legend.text = element_text(size = 8)
+    )
+}
+
+save_fig(
+  p_anme,
+  "09_arch_relabund_ANME.png",
+  w = 7,
+  h = 5
+)
+
+p_anme
+```
+
+# Session info
+
+```{r sessioninfo}
+sessionInfo()
+```
