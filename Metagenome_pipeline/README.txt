@@ -125,3 +125,133 @@ Here starts there comparative genomics part, where the workflow is very similar 
 
 23: DeepTMHMM annotation
 23_run_semibin2_deeptmhmm_array.sbatch: Runs DeepTMHMM on the selected SemiBin2 candidate proteins.
+
+24: Build integrated SemiBin2 protein annotations
+24_build_semibin2_integrated_annotations.py: Integrates FeGenie, FindMeHemes, SignalP6 and DeepTMHMM results into a single protein-level annotation table for the SemiBin2 MAGs.
+
+25: Summarize Methylococcales candidates
+25_summarize_methylococcales_candidates.py: Extracts and summarizes candidate proteins from the 16 Methylococcales MAGs.
+
+26: Map MAG proteins to GlobDB protein families
+26.1_prepare_methylococcales_globdb_queries.py: Prepares Methylococcales MAG proteins for comparison with the GlobDB Methylococcales protein-family dataset.
+
+26.2_map_methylococcales_to_globdb_clusters.sbatch: Maps MAG proteins to the previously defined GlobDB MMseqs2 protein-family clusters.
+
+27: Build Methylococcales MAG gene catalogue
+27_build_methylococcales_gene_catalog.py: Builds a gene-level catalogue containing coordinates, functional annotations and GlobDB cluster assignments for the Methylococcales MAGs.
+
+28: Extract priority genomic neighborhoods
+28.1_build_priority_context_observability.py: Determines how much genomic context is observable around priority candidate proteins.
+
+28.2_extract_priority_observed_neighborhoods.py: Extracts observable genomic neighborhoods around priority candidate proteins while accounting for contig boundaries.
+
+28.3_prepare_priority_neighborhood_proteins.py: Collects proteins from the extracted priority neighborhoods for downstream annotation and clustering.
+
+29: Annotate neighborhood proteins using GlobDB
+29.1_build_globdb_annotation_reference.py: Builds a reference database of annotated GlobDB proteins.
+
+29.2_search_neighborhood_proteins_against_globdb.sbatch: Searches MAG neighborhood proteins against the GlobDB annotation reference.
+
+29.3_transfer_globdb_annotations.py: Transfers supported GlobDB functional annotations to matching MAG neighborhood proteins.
+
+30: Local protein-family and architecture analysis
+30.1_cluster_priority_neighborhood_proteins.sbatch: Clusters proteins from priority MAG neighborhoods using MMseqs2.
+
+30.2_build_local_family_architecture_tables.py: Builds local-family membership, prevalence and genomic-architecture tables from the neighborhood clustering results.
+
+31: Direct COG20 annotation
+31.1_run_direct_cog20_annotation.sbatch: Performs direct COG20 annotation of priority neighborhood proteins.
+
+31.2_integrate_direct_cog20_annotations.py: Integrates the direct COG20 results with the existing neighborhood annotation tables.
+
+32: Cluster_00121 combined comparative dataset
+32.1_build_cluster00121_combined_dataset.py: Combines Cluster_00121 proteins from GlobDB genomes and Methylococcales MAGs into a common dataset.
+
+32.2_build_cluster00121_combined_neighborhoods.py: Builds comparable genomic neighborhoods around all GlobDB and MAG Cluster_00121 proteins.
+
+32.3_cluster_cluster00121_combined_neighborhoods.sbatch: Clusters proteins from the combined Cluster_00121 neighborhoods into local protein families.
+
+32.4_build_cluster00121_local_architecture.py: Builds local-family and genomic-architecture tables for the combined Cluster_00121 neighborhoods.
+
+32.5_summarize_cluster00121_architecture.py: Summarizes recurrent local architectures and conserved protein families surrounding Cluster_00121.
+
+33: Cluster_00121 structural analysis
+33.1_prepare_cluster00121_alphafold_hemeC9.py: Selects representative Cluster_00121 proteins and prepares nine-heme AlphaFold inputs.
+
+33.2_qc_cluster00121_alphafold.py: Performs quality control and heme-geometry assessment of the Cluster_00121 AlphaFold predictions.
+
+33.3_parse_cluster00121_foldseek.py: Parses Foldseek searches of the selected Cluster_00121 structures and summarizes structural homologues.
+
+34: Methylobacter multiheme structural analysis
+34.1_prepare_methylobacter_multiheme_alphafold.py: Selects representative Methylobacter multiheme cytochromes and prepares AlphaFold inputs.
+
+34.2_qc_methylobacter_multiheme_alphafold.py: Performs structural and heme-geometry quality control of the Methylobacter multiheme AlphaFold predictions.
+
+34.3_parse_methylobacter_multiheme_foldseek.py: Parses Foldseek results for the selected Methylobacter multiheme proteins.
+
+35: Cyc2 structural comparison
+35.1_prepare_cyc2_four_panel_alphafold.py: Prepares four representative Cyc2-family proteins from the MAG and GlobDB datasets for AlphaFold comparison.
+
+35.2_qc_cyc2_four_panel_alphafold.py: Performs quality control of the four Cyc2 AlphaFold predictions.
+
+36: Final mature-protein structure set
+36.1_prepare_mature_structure_alphafold_batch.py: Combines the selected Cluster_00121, Methylobacter multiheme and Cyc2 proteins into a single mature-protein AlphaFold batch, removing predicted signal peptides where appropriate.
+
+36.2_qc_final_mature_alphafold.py: Performs unified QC and model selection for the final mature AlphaFold structure set.
+
+36.3_build_final_mature_figure_manifests.py: Builds the manifests used to generate the final structure-comparison figures.
+
+The final structure figures themselves were generated using a separate consolidated figure-building workflow from the Stage-36 selected structures.
+
+37: Cluster_00121 neighborhood visualization
+37.1_plot_cluster00121_neighborhoods.R: Generates the initial gene-map visualization of representative Cluster_00121 neighborhoods.
+
+37.2_finalize_cluster00121_neighborhood_figure.R: Produces the final refined Cluster_00121 neighborhood figure.
+
+38: Integrate MAGs into the Module 10 analysis
+38.1_build_module10_with_MAGs.R: Integrates relevant MAG Cyc2 loci with the existing GlobDB Module 10 architecture dataset.
+
+38.2_plot_module10_with_MAGs.R: Generates the combined GlobDB + MAG Module 10 gene-map figure.
+
+39: Cluster_00121 contextual QC
+39.1_check_cluster00121_local_context.R: Performs additional QC of the local genomic context surrounding Cluster_00121 proteins.
+
+39.2_check_cluster00121_module10_links.R: Examines genomic relationships between Cluster_00121 proteins and Module 10-associated loci.
+
+40: Prepare the final species phylogeny
+40.1_download_umezawa_allocrenothrix_genomes.sh: Downloads two published Allocrenothrix methanica genomes included in the final phylogenetic analysis.
+
+40.2_prepare_final_species_tree_inputs.sh: Combines the 631 GlobDB Methylococcales genomes, 16 Methylococcales MAGs, two Allocrenothrix genomes and one Methylophaga outgroup into the final tree input set.
+
+41: Build the final bac120 species tree
+41.1_final_tree_gtdbtk_identify.sh: Identifies GTDB-Tk bac120 marker genes in the final genome collection.
+
+41.2_final_tree_gtdbtk_align.sh: Builds the concatenated bac120 marker alignment.
+
+41.3_final_tree_fasttree.sh: Infers the final species tree from the bac120 alignment using FastTree.
+
+41.4_root_final_species_tree.R: Roots the final species tree using the Methylophaga outgroup.
+
+42: Additional quality and MCA0421 annotation
+42.1_checkm2_umezawa_genomes.sh: Runs CheckM2 on the two Allocrenothrix genomes to obtain quality metrics comparable with the MAGs.
+
+42.2_check_MCA0421_umezawa.sh: Screens the Allocrenothrix genomes for MCA0421-family homologues.
+
+43: Build final species-tree metadata
+43_build_final_tree_metadata.R: Creates the metadata table used to annotate all tips in the final species tree.
+
+44: Plot the annotated species tree
+44_plot_final_tree_MCA0421_quality_refined.R: Generates the refined species tree showing Cyc2 family origin, Module 20 proteins, MCA0421-family homologues, genome completeness, contamination and taxonomic labels.
+
+45: Methane monooxygenase classification
+45.1_fix_fident_and_reclassify.sh: Applies the final identity interpretation and classifies genomes according to detected pMMO and sMMO components.
+
+45.2_qc_pmmo_pxm_smmo.sh: Performs QC of pMMO, pXMO and sMMO component assignments.
+
+45.3_qc_MMO_none_by_taxonomy_quality.R: Examines genomes lacking detected MMO systems in relation to taxonomy and genome quality.
+
+46: Build final Cluster_00121 and MMO tree tracks
+46_build_final_C121_MMO_tree_tracks.R: Builds the final tree-track tables describing Cluster_00121 occurrence and MMO status across the complete phylogeny.
+
+47: Add Cluster_00121 and MMO tracks to the final tree
+47_add_C121_MMO_to_final_tree.py: Adds the final Cluster_00121 and methane-monooxygenase annotation tracks to the established species-tree visualization.
