@@ -1,1 +1,28 @@
 This is the last part of the analysis preparing select proteins for alphafold, finding best models, plotting, and preparing models for foldseek search.
+
+01: Prepare Alphafold jobs
+01_prepare_mature_heme_jobs.py: Extracts selected protein family representatives and creates .json Alphafold-jobs with heme C ligands included.
+
+02: Best Model
+02_extract_best_models.py: Extracts best Alphafold models from the Alphafold data.
+
+03: Audit QC
+03_audit_alphafold_sources.py: Audits the Alphafold models.
+
+04: Manifest
+04_build_standard_structure_manifest.py: Build a standardized Alphafold model structure manifest.
+
+05: Comparative statistics
+05_run_usalign_comparisons.py: Calculates TM-score and RMSD between reference proteins and other representatives.
+
+06: Final plot manifest
+06_build_final_plot_manifest.py: Collect all needed data for the final protein figures.
+
+07: Render individual protein panels
+07_render_standardized_holo_structures.py: Renders protein models with heme C ligands using PYMOL.
+
+08: Assembly
+08_assemble_standardized_structure_figure.py: Assembles all the rendered panels into figures.
+
+09: Foldseek
+09_prepare_foldseek_jobs.py: Prepares best alphafold models for Foldseek as .cif.
