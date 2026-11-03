@@ -243,15 +243,11 @@ The final structure figures themselves were generated using a separate consolida
 44: Plot the annotated species tree
 44_plot_final_tree_MCA0421_quality_refined.R: Generates the refined species tree showing Cyc2 family origin, Module 20 proteins, MCA0421-family homologues, genome completeness, contamination and taxonomic labels.
 
-45: Methane monooxygenase classification
-45.1_fix_fident_and_reclassify.sh: Applies the final identity interpretation and classifies genomes according to detected pMMO and sMMO components.
+45: Plot MAG tree
+45_plot_MAG_tree.R Generates phylogeny from the same alignment as previously, however, only MAGs and reference genomes are included. MMO and estimated completeness and contamination are shown.
 
-45.2_qc_pmmo_pxm_smmo.sh: Performs QC of pMMO, pXMO and sMMO component assignments.
+46: Make MAG appendix
+46_make_MAG_appendix.R: Produces a .docx with a table of all MAGs, their information and statistics.
 
-45.3_qc_MMO_none_by_taxonomy_quality.R: Examines genomes lacking detected MMO systems in relation to taxonomy and genome quality.
-
-46: Build final Cluster_00121 and MMO tree tracks
-46_build_final_C121_MMO_tree_tracks.R: Builds the final tree-track tables describing Cluster_00121 occurrence and MMO status across the complete phylogeny.
-
-47: Add Cluster_00121 and MMO tracks to the final tree
-47_add_C121_MMO_to_final_tree.py: Adds the final Cluster_00121 and methane-monooxygenase annotation tracks to the established species-tree visualization.
+47: Make Cluster appendix
+47_make_Cluster_appendix.R: Produces a .docx with a table of all Clusters of interest, their information and statistics.
