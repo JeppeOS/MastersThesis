@@ -1,5 +1,11 @@
 #!/usr/bin/env Rscript
 
+## Bottom grouped-legend variant:
+##
+##   - categorical legend contents remain vertically stacked
+##   - legend blocks are arranged horizontally below the phylogeny
+##   - original Stage 92 script and outputs remain untouched
+##
 ## ================================================================== ##
 ## STAGE 92
 ##
@@ -33,6 +39,8 @@
 ##   - no floating in-gap track labels
 ##   - alternating grey genus-level shading extends from tree centre
 ##     to the inner edge of the first track
+##   - MAG-derived tips highlighted with yellow background sectors
+##   - Umezawa reference genomes highlighted with red background sectors
 ## ================================================================== ##
 
 suppressPackageStartupMessages({
@@ -130,17 +138,17 @@ MAG_CLUSTER_MAP <- file.path(
 
 PDF_OUT <- file.path(
     OUTDIR,
-    "final_bac120_Cyc2_Module20_MCA0421_quality_refined.pdf"
+    "final_bac120_Cyc2_Module20_MCA0421_quality_refined_grouped_bottom_legend_MAGyellow_Umezawared.pdf"
 )
 
 PNG_OUT <- file.path(
     OUTDIR,
-    "final_bac120_Cyc2_Module20_MCA0421_quality_refined.png"
+    "final_bac120_Cyc2_Module20_MCA0421_quality_refined_grouped_bottom_legend_MAGyellow_Umezawared.png"
 )
 
 TRACK_OUT <- file.path(
     OUTDIR,
-    "final_650_tip_functional_tracks_refined.tsv"
+    "final_650_tip_functional_tracks_refined_grouped_bottom_legend.tsv"
 )
 
 
@@ -235,9 +243,33 @@ COMPLETENESS_HIGH <- "#08519C"
 CONTAMINATION_LOW  <- "#FFF5F0"
 CONTAMINATION_HIGH <- "#A50F15"
 
-## Alternating genus shading
+## ================================================================== ##
+## Background shading
+##
+## Ordinary genomes retain alternating genus-level grey shading.
+## MAG-derived genomes receive a yellow overlay.
+## Umezawa Allocrenothrix reference genomes receive a red overlay.
+## ================================================================== ##
+
 GENUS_SHADE_LIGHT <- "grey96"
 GENUS_SHADE_DARK  <- "grey88"
+
+MAG_SHADE_COLOR <-
+    scales::alpha(
+        "#F0E442",       # yellow
+        0.45
+    )
+
+UMEZAWA_SHADE_COLOR <-
+    scales::alpha(
+        "#B2182B",       # dark red
+        0.32
+    )
+
+UMEZAWA_GENOMES <- c(
+    "UME_AF98_Allocrenothrix_methanica",
+    "UME_MI19235_Allocrenothrix_methanica"
+)
 
 ## ================================================================== ##
 ## MAG tree-ID crosswalk
@@ -1072,32 +1104,102 @@ tip_geom$text_hjust[flip] <- 1
 ## an otherwise continuous clade.
 ## ================================================================== ##
 
+## ================================================================== ##
+## Genus-level alternating background sectors
+##
+## Taxonomy / tip labels remain untouched.
+##
+## "shade_group" is ONLY used for the grey background. This allows
+## selected placeholder GTDB genera to be visually merged with the
+## surrounding biological genus block.
+## ================================================================== ##
+
+## ================================================================== ##
+## Genus-level alternating background sectors
+##
+## Taxonomy / tip labels remain untouched.
+##
+## "shade_group" is ONLY used for the grey background.
+## ================================================================== ##
+
 tip_shading <- tip_geom %>%
     arrange(y) %>%
     mutate(
 
         ## Start from actual GTDB genus when available.
         shade_group = case_when(
-            !is.na(genus) & genus != "" ~ genus,
-            TRUE ~ species_label
+            !is.na(genus) &
+                genus != "" ~
+                as.character(genus),
+
+            TRUE ~
+                as.character(species_label)
         ),
 
+        ## ---------------------------------------------------------- ##
         ## Manual visual-group corrections only for shading.
+        ##
+        ## These do NOT modify taxonomy or displayed labels.
+        ## ---------------------------------------------------------- ##
+
         shade_group = case_when(
 
             ## Patch SPIREOTU_00336771 into the surrounding
             ## Methylovulum shading block.
-            genus == "SPIREOTU_00336771" ~ "Methylovulum",
+            genus ==
+                "SPIREOTU_00336771" ~
+                "Methylovulum",
+
+            ## Patch the complete SPIREOTU_00519314 clade into the
+            ## surrounding Methylumidiphilus shading block.
+            genome %in% c(
+                "BCRBG_22465",
+                "SPIREOTU_00519314",
+                "MOTU40_079870"
+            ) ~
+                "Methylumidiphilus",
 
             ## Treat UBA4132 and Allocrenothrix as one continuous
             ## shading block.
-            genus %in% c("UBA4132", "Allocrenothrix") ~
+            genus %in% c(
+                "UBA4132",
+                "Allocrenothrix"
+            ) ~
                 "UBA4132_Allocrenothrix",
 
-            TRUE ~ shade_group
+            TRUE ~
+                shade_group
         )
     )
 
+
+## ================================================================== ##
+## QC: confirm the three SPIREOTU_00519314 tips were reassigned
+## ================================================================== ##
+
+cat(
+    "\nSPIREOTU_00519314 shading QC:\n"
+)
+
+print(
+    tip_shading %>%
+        filter(
+            genome %in% c(
+                "BCRBG_22465",
+                "SPIREOTU_00519314",
+                "MOTU40_079870"
+            )
+        ) %>%
+        select(
+            genome,
+            y,
+            genus,
+            species_label,
+            shade_group
+        ) %>%
+        arrange(y),
+    n = Inf
+)
 ## ================================================================== ##
 ## Patch isolated one-tip holes automatically
 ##
@@ -1150,12 +1252,26 @@ genus_blocks <- tip_shading %>%
     )
 
 ## ================================================================== ##
-## Grey shading rectangles
+## Background shading rectangles
+##
+## 1. Ordinary alternating genus-level grey shading
+## 2. Yellow overlay for MAG-derived genomes
+## 3. Red overlay for Umezawa reference genomes
+##
+## Special colors affect background shading only.
+## Taxonomy, tip labels, topology, and functional tracks are unchanged.
 ## ================================================================== ##
+
+
+## ------------------------------------------------------------------ ##
+## Ordinary alternating genus shading
+## ------------------------------------------------------------------ ##
 
 shade_light <- geom_rect(
     data = genus_blocks %>%
-        filter(shade_group_number == 0L),
+        filter(
+            shade_group_number == 0L
+        ),
     aes(
         xmin = xmin,
         xmax = xmax,
@@ -1167,9 +1283,12 @@ shade_light <- geom_rect(
     color = NA
 )
 
+
 shade_dark <- geom_rect(
     data = genus_blocks %>%
-        filter(shade_group_number == 1L),
+        filter(
+            shade_group_number == 1L
+        ),
     aes(
         xmin = xmin,
         xmax = xmax,
@@ -1181,9 +1300,172 @@ shade_dark <- geom_rect(
     color = NA
 )
 
-## Put shading behind the tree.
+
+## ================================================================== ##
+## MAG and Umezawa tip-specific background shading
+##
+## Each highlighted tip receives its own sector from the tree centre
+## to the inner edge of the first functional track.
+##
+## This guarantees that only actual MAG-derived or Umezawa tips are
+## highlighted, even when they occur next to ordinary GlobDB genomes.
+## ================================================================== ##
+
+special_shading <- tip_geom %>%
+    mutate(
+
+        special_shade = case_when(
+
+            genome %in%
+                UMEZAWA_GENOMES ~
+                "Umezawa reference",
+
+            is_MAG ~
+                "MAG",
+
+            TRUE ~
+                NA_character_
+        ),
+
+        ymin =
+            y - 0.5,
+
+        ymax =
+            y + 0.5,
+
+        xmin =
+            0,
+
+        xmax =
+            CYC2_XMIN
+    ) %>%
+    filter(
+        !is.na(
+            special_shade
+        )
+    )
+
+
+## ------------------------------------------------------------------ ##
+## Yellow MAG sectors
+## ------------------------------------------------------------------ ##
+
+mag_shade <- geom_rect(
+    data = special_shading %>%
+        filter(
+            special_shade ==
+                "MAG"
+        ),
+    aes(
+        xmin = xmin,
+        xmax = xmax,
+        ymin = ymin,
+        ymax = ymax
+    ),
+    inherit.aes = FALSE,
+    fill = MAG_SHADE_COLOR,
+    color = NA
+)
+
+
+## ------------------------------------------------------------------ ##
+## Red Umezawa reference sectors
+## ------------------------------------------------------------------ ##
+
+umezawa_shade <- geom_rect(
+    data = special_shading %>%
+        filter(
+            special_shade ==
+                "Umezawa reference"
+        ),
+    aes(
+        xmin = xmin,
+        xmax = xmax,
+        ymin = ymin,
+        ymax = ymax
+    ),
+    inherit.aes = FALSE,
+    fill = UMEZAWA_SHADE_COLOR,
+    color = NA
+)
+
+
+## ================================================================== ##
+## QC
+## ================================================================== ##
+
+cat(
+    "\nSpecial background shading QC:\n"
+)
+
+cat(
+    "MAG tips highlighted: ",
+    sum(
+        special_shading$special_shade ==
+            "MAG"
+    ),
+    "\n",
+    sep = ""
+)
+
+cat(
+    "Umezawa reference tips highlighted: ",
+    sum(
+        special_shading$special_shade ==
+            "Umezawa reference"
+    ),
+    "\n",
+    sep = ""
+)
+
+
+if (
+    sum(
+        special_shading$special_shade ==
+            "MAG"
+    ) != 16
+) {
+
+    stop(
+        "Expected 16 MAG tips in special shading."
+    )
+}
+
+
+if (
+    sum(
+        special_shading$special_shade ==
+            "Umezawa reference"
+    ) != 2
+) {
+
+    stop(
+        "Expected 2 Umezawa reference genomes in special shading."
+    )
+}
+
+
+## ================================================================== ##
+## Put all background shading behind the tree
+##
+## Layer order:
+##
+##   grey genus shading
+##       ↓
+##   yellow / red special overlays
+##       ↓
+##   phylogenetic tree
+##
+## Transparency preserves some of the underlying genus shading.
+## ================================================================== ##
+
 p_base$layers <- c(
-    list(shade_light, shade_dark),
+    list(
+        shade_light,
+        shade_dark,
+        mag_shade,
+        umezawa_shade
+    ),
     p_base$layers
 )
 
@@ -1442,6 +1724,18 @@ p <- p_base +
         drop = TRUE,
         na.value = "white",
         name = "Cyc2 focal-module\norigin"
+,
+
+        guide = guide_legend(
+            ncol = 1,
+            byrow = TRUE,
+            order = 1,
+            title.position = "top",
+            title.hjust = 0,
+            keywidth = grid::unit(0.28, "cm"),
+            keyheight = grid::unit(0.28, "cm")
+        )
+
     ) +
 
     ggnewscale::new_scale_fill() +
@@ -1469,6 +1763,18 @@ p <- p_base +
         drop = TRUE,
         na.value = "white",
         name = "Module 20\nCluster_00035"
+,
+
+        guide = guide_legend(
+            ncol = 1,
+            byrow = TRUE,
+            order = 2,
+            title.position = "top",
+            title.hjust = 0,
+            keywidth = grid::unit(0.28, "cm"),
+            keyheight = grid::unit(0.28, "cm")
+        )
+
     ) +
 
     ggnewscale::new_scale_fill() +
@@ -1496,6 +1802,18 @@ p <- p_base +
         labels = "Present",
         drop = FALSE,
         name = "MCA0421-family\nhomolog"
+,
+
+        guide = guide_legend(
+            ncol = 1,
+            byrow = TRUE,
+            order = 3,
+            title.position = "top",
+            title.hjust = 0,
+            keywidth = grid::unit(0.28, "cm"),
+            keyheight = grid::unit(0.28, "cm")
+        )
+
     ) +
 
     ggnewscale::new_scale_fill() +
@@ -1544,6 +1862,18 @@ p <- p_base +
 
         name =
             "Cluster_00121"
+,
+
+        guide = guide_legend(
+            ncol = 1,
+            byrow = TRUE,
+            order = 4,
+            title.position = "top",
+            title.hjust = 0,
+            keywidth = grid::unit(0.28, "cm"),
+            keyheight = grid::unit(0.28, "cm")
+        )
+
     ) +
 
 
@@ -1606,6 +1936,18 @@ p <- p_base +
 
         name =
             "Methane\nmonooxygenase"
+,
+
+        guide = guide_legend(
+            ncol = 1,
+            byrow = TRUE,
+            order = 5,
+            title.position = "top",
+            title.hjust = 0,
+            keywidth = grid::unit(0.28, "cm"),
+            keyheight = grid::unit(0.28, "cm")
+        )
+
     ) +
 
 
@@ -1637,6 +1979,17 @@ p <- p_base +
         oob = squish,
         na.value = "grey85",
         name = "CheckM2\ncompleteness (%)"
+,
+
+        guide = guide_colorbar(
+            direction = "horizontal",
+            order = 6,
+            title.position = "top",
+            title.hjust = 0,
+            barwidth = grid::unit(1.65, "cm"),
+            barheight = grid::unit(0.20, "cm")
+        )
+
     ) +
 
     ggnewscale::new_scale_fill() +
@@ -1663,6 +2016,17 @@ p <- p_base +
         high = CONTAMINATION_HIGH,
         na.value = "grey85",
         name = "CheckM2\ncontamination (%)"
+,
+
+        guide = guide_colorbar(
+            direction = "horizontal",
+            order = 7,
+            title.position = "top",
+            title.hjust = 0,
+            barwidth = grid::unit(1.65, "cm"),
+            barheight = grid::unit(0.20, "cm")
+        )
+
     ) +
 
     ## -------------------------------------------------------------- ##
@@ -1720,10 +2084,57 @@ p <- p_base +
             face = "bold",
             size = 15
         ),
-        legend.position = "right",
-        legend.box = "vertical",
-        legend.title = element_text(size = 9),
-        legend.text = element_text(size = 8),
+        legend.position = "bottom",
+        legend.box = "horizontal",
+        legend.box.just = "center",
+        legend.direction = "vertical",
+
+        legend.title = element_text(
+            size = 7.4,
+            face = "bold",
+            hjust = 0
+        ),
+
+        legend.text = element_text(
+            size = 7.0
+        ),
+
+        legend.key.size = grid::unit(
+            0.28,
+            "cm"
+        ),
+
+        legend.key.width = grid::unit(
+            0.30,
+            "cm"
+        ),
+
+        legend.key.height = grid::unit(
+            0.28,
+            "cm"
+        ),
+
+        legend.spacing.x = grid::unit(
+            0.18,
+            "cm"
+        ),
+
+        legend.spacing.y = grid::unit(
+            0.03,
+            "cm"
+        ),
+
+        legend.box.spacing = grid::unit(
+            0.18,
+            "cm"
+        ),
+
+        legend.margin = margin(
+            t = 3,
+            r = 0,
+            b = 0,
+            l = 0
+        ),
         plot.margin = margin(20, 35, 20, 20)
     )
 
