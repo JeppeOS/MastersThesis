@@ -88,9 +88,14 @@ sample_order <- paste0(
   "_seqs"
 )
 
-sample_labels <- paste0(
-  "barcode",
-  10:16
+sample_labels <- c(
+  "barcode10" = "BRt5_2",
+  "barcode11" = "ULt4_2",
+  "barcode12" = "FHt_2",
+  "barcode13" = "UL_3 (Anoxic)",
+  "barcode14" = "UL_SAt_2",
+  "barcode15" = "UL_SAt_3",
+  "barcode16" = "UL_SA_3"
 )
 
 
@@ -145,34 +150,47 @@ category_order <- c(
 ## Same taxon = same colour in both panels.
 ## ------------------------------------------------------------
 
+## ------------------------------------------------------------
+## Common colour palette
+##
+## Shared methanotroph genera use EXACTLY the same colours
+## as in the amplicon-sequencing figures.
+##
+## Categories unique to this metagenome figure are assigned
+## additional distinct colours.
+## ------------------------------------------------------------
+
 taxon_colours <- c(
 
+  ## Same colours as fixed methanotroph palette ##
   "Methylobacter_A" =
-    "#1F78B4",
+    "#0072B2",
 
   "Methylobacter_C" =
-    "#66C2FF",
+    "#B22222",
 
   "Methylovulum" =
-    "#E6AB02",
-
-  "Methylomonas" =
-    "#1B9E77",
-
-  "Methylumidiphilus" =
     "#CC79A7",
 
+  "Methylomonas" =
+    "#D55E00",
+
+  "Methylumidiphilus" =
+    "#E69F00",
+
   "Methylicorpusculum" =
-    "#D95F02",
+    "#66A61E",
 
   "UBA4132" =
-    "#B15928",
+    "#00A6A6",
 
+
+  ## Additional categories specific to this analysis ##
   "UBA6136" =
     "#8E63CE",
 
   "Methylococcales_unclassified" =
-    "#F0E442",
+    "#17BECF",
 
   "Other" =
     "#BDBDBD"
@@ -328,6 +346,18 @@ print(
 
 
 ## ------------------------------------------------------------
+## Legend display labels
+## ------------------------------------------------------------
+
+category_labels <- setNames(
+  category_order,
+  category_order
+)
+
+category_labels["Other"] <- "Other non-methanotrophs"
+
+
+## ------------------------------------------------------------
 ## Common fill scale
 ## ------------------------------------------------------------
 
@@ -341,11 +371,12 @@ common_fill_scale <- scale_fill_manual(
 
   limits = category_order,
 
+  labels = category_labels,
+
   drop = FALSE,
 
   na.value = "#000000"
 )
-
 
 ## ------------------------------------------------------------
 ## Explicit legend colours
