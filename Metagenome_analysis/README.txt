@@ -126,61 +126,59 @@ Here starts there comparative genomics part, where the workflow is very similar 
 23: DeepTMHMM annotation
 23_run_semibin2_deeptmhmm_array.sbatch: Runs DeepTMHMM on the selected SemiBin2 candidate proteins.
 
-24: Build integrated SemiBin2 protein annotations
-24_build_semibin2_integrated_annotations.py: Integrates FeGenie, FindMeHemes, SignalP6 and DeepTMHMM results into a single protein-level annotation table for the SemiBin2 MAGs.
+24: Build integrated annotations for bins
+24_build_semibin2_integrated_annotations.py: Integrates all information including FeGenie, DeepTMHMM, SignalP, FindMeHemes, etc. of the MAGs into a single table.
 
 25: Summarize Methylococcales candidates
-25_summarize_methylococcales_candidates.py: Extracts and summarizes candidate proteins from the 16 Methylococcales MAGs.
+25_summarize_methylococcales_candidates.py: Summarizes candidate proteins from the 16 MAGs.
 
-26: Map MAG proteins to GlobDB protein families
-26.1_prepare_methylococcales_globdb_queries.py: Prepares Methylococcales MAG proteins for comparison with the GlobDB Methylococcales protein-family dataset.
+26: Group MAG proteins to existing protein families
+26.1_prepare_methylococcales_globdb_queries.py: Prepares the MAG data for comparison with MMseqs2 protein families.
 
-26.2_map_methylococcales_to_globdb_clusters.sbatch: Maps MAG proteins to the previously defined GlobDB MMseqs2 protein-family clusters.
+26.2_map_methylococcales_to_globdb_clusters.sbatch: Maps MAG proteins to clusters.
 
 27: Build Methylococcales MAG gene catalogue
-27_build_methylococcales_gene_catalog.py: Builds a gene-level catalogue containing coordinates, functional annotations and GlobDB cluster assignments for the Methylococcales MAGs.
+27_build_methylococcales_gene_catalog.py: Builds a catalogue containing genomic information and protein family for the Methylococcales MAG proteins.
 
-28: Extract priority genomic neighborhoods
-28.1_build_priority_context_observability.py: Determines how much genomic context is observable around priority candidate proteins.
+28: Extract genomic neighborhoods
+28.1_build_priority_context_observability.py: Finds available genomic context around focal genes.
 
-28.2_extract_priority_observed_neighborhoods.py: Extracts observable genomic neighborhoods around priority candidate proteins while accounting for contig boundaries.
+28.2_extract_priority_observed_neighborhoods.py: Extract MAG genomic neighborhoods accounting for contigs.
 
-28.3_prepare_priority_neighborhood_proteins.py: Collects proteins from the extracted priority neighborhoods for downstream annotation and clustering.
+28.3_prepare_priority_neighborhood_proteins.py: Searches genes in neighborhoods and prepares for annotation.
 
-29: Annotate neighborhood proteins using GlobDB
-29.1_build_globdb_annotation_reference.py: Builds a reference database of annotated GlobDB proteins.
+29: Annotate neighborhood proteins with GlobDB
+29.1_build_globdb_annotation_reference.py: Builds a all-protein reference cataloge from GlobDB genomes.
 
-29.2_search_neighborhood_proteins_against_globdb.sbatch: Searches MAG neighborhood proteins against the GlobDB annotation reference.
+29.2_search_neighborhood_proteins_against_globdb.sbatch: Search MAG genomic neighborhood genes against the globdb reference catalogue.
 
-29.3_transfer_globdb_annotations.py: Transfers supported GlobDB functional annotations to matching MAG neighborhood proteins.
+29.3_transfer_globdb_annotations.py: Annotates MAG genomic neighborhood genes.
 
-30: Local protein-family and architecture analysis
-30.1_cluster_priority_neighborhood_proteins.sbatch: Clusters proteins from priority MAG neighborhoods using MMseqs2.
+30: Recurrence in MAG neighborhoods
+30.1_cluster_priority_neighborhood_proteins.sbatch: Clusters proteins in MAG neighborhoods.
 
-30.2_build_local_family_architecture_tables.py: Builds local-family membership, prevalence and genomic-architecture tables from the neighborhood clustering results.
+30.2_build_local_family_architecture_tables.py: Builds from the neighborhood clustering results with information about MAG protein members.
 
-31: Direct COG20 annotation
-31.1_run_direct_cog20_annotation.sbatch: Performs direct COG20 annotation of priority neighborhood proteins.
+31: COG20 annotation
+31.1_run_direct_cog20_annotation.sbatch: Runs Anvi'o on the neighborhood proteins.
 
-31.2_integrate_direct_cog20_annotations.py: Integrates the direct COG20 results with the existing neighborhood annotation tables.
+31.2_integrate_direct_cog20_annotations.py: Integrates COG20 annotations with GlobDB annotations.
 
-32: Cluster_00121 combined comparative dataset
-32.1_build_cluster00121_combined_dataset.py: Combines Cluster_00121 proteins from GlobDB genomes and Methylococcales MAGs into a common dataset.
+32: Cluster_00121 architecture
+32.1_build_cluster00121_combined_dataset.py: Builds a Cluster_00121 dataset with all cluster_00121.
 
-32.2_build_cluster00121_combined_neighborhoods.py: Builds comparable genomic neighborhoods around all GlobDB and MAG Cluster_00121 proteins.
+32.2_build_cluster00121_combined_neighborhoods.py: Builds the neighborhoods around the extracted cluster_00121.
 
-32.3_cluster_cluster00121_combined_neighborhoods.sbatch: Clusters proteins from the combined Cluster_00121 neighborhoods into local protein families.
+32.3_cluster_cluster00121_combined_neighborhoods.sbatch: Groups neighborhood proteins against all proteins.
 
-32.4_build_cluster00121_local_architecture.py: Builds local-family and genomic-architecture tables for the combined Cluster_00121 neighborhoods.
+32.4_build_cluster00121_local_architecture.py: Builds local architecture of the genomic neighborhoods.
 
-32.5_summarize_cluster00121_architecture.py: Summarizes recurrent local architectures and conserved protein families surrounding Cluster_00121.
+32.5_summarize_cluster00121_architecture.py: Summrizes recurrent and conserved proteins in the Cluster_00121 neighborhood.
 
 33: Cluster_00121 structural analysis
-33.1_prepare_cluster00121_alphafold_hemeC9.py: Selects representative Cluster_00121 proteins and prepares nine-heme AlphaFold inputs.
+33.1_prepare_cluster00121_alphafold_hemeC9.py: Prepares cluster_00121 for alphafold, writes job to .json.
 
-33.2_qc_cluster00121_alphafold.py: Performs quality control and heme-geometry assessment of the Cluster_00121 AlphaFold predictions.
-
-33.3_parse_cluster00121_foldseek.py: Parses Foldseek searches of the selected Cluster_00121 structures and summarizes structural homologues.
+33.2_qc_cluster00121_alphafold.py: Evaluates Alphafold predicted models, and extracts the best.
 
 34: Methylobacter multiheme structural analysis
 34.1_prepare_methylobacter_multiheme_alphafold.py: Selects representative Methylobacter multiheme cytochromes and prepares AlphaFold inputs.
