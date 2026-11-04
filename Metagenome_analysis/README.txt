@@ -175,74 +175,71 @@ Here starts there comparative genomics part, where the workflow is very similar 
 
 32.5_summarize_cluster00121_architecture.py: Summrizes recurrent and conserved proteins in the Cluster_00121 neighborhood.
 
-33: Cluster_00121 structural analysis
+33: Cluster_00121 structural analysis (Outdated)
 33.1_prepare_cluster00121_alphafold_hemeC9.py: Prepares cluster_00121 for alphafold, writes job to .json.
 
 33.2_qc_cluster00121_alphafold.py: Evaluates Alphafold predicted models, and extracts the best.
 
-34: Methylobacter multiheme structural analysis
-34.1_prepare_methylobacter_multiheme_alphafold.py: Selects representative Methylobacter multiheme cytochromes and prepares AlphaFold inputs.
+34: Methylobacter multiheme structural analysis (Outdated)
+34.1_prepare_methylobacter_multiheme_alphafold.py: Prepares Methylobacter multiheme cytochromes for alphafold, writes job to .json.
 
-34.2_qc_methylobacter_multiheme_alphafold.py: Performs structural and heme-geometry quality control of the Methylobacter multiheme AlphaFold predictions.
+34.2_qc_methylobacter_multiheme_alphafold.py: Evaluates Alphafold predicted models, and extracts the best.
 
-34.3_parse_methylobacter_multiheme_foldseek.py: Parses Foldseek results for the selected Methylobacter multiheme proteins.
+35: Cyc2 structural comparison (Outdated)
+35.1_prepare_cyc2_four_panel_alphafold.py: Prepares Cyc2 representatives for alphafold, writes job to .json.
 
-35: Cyc2 structural comparison
-35.1_prepare_cyc2_four_panel_alphafold.py: Prepares four representative Cyc2-family proteins from the MAG and GlobDB datasets for AlphaFold comparison.
-
-35.2_qc_cyc2_four_panel_alphafold.py: Performs quality control of the four Cyc2 AlphaFold predictions.
+35.2_qc_cyc2_four_panel_alphafold.py: Evaluates Alphafold predicted models, and extracts the best.
 
 36: Final mature-protein structure set
-36.1_prepare_mature_structure_alphafold_batch.py: Combines the selected Cluster_00121, Methylobacter multiheme and Cyc2 proteins into a single mature-protein AlphaFold batch, removing predicted signal peptides where appropriate.
+36.1_prepare_mature_structure_alphafold_batch.py: Prepares Cyc2 representatives, methylobacter multihemes and Cluster_00121 for alphafold remembering to remove signal peptides, writes job to .json.
 
-36.2_qc_final_mature_alphafold.py: Performs unified QC and model selection for the final mature AlphaFold structure set.
+36.2_qc_final_mature_alphafold.py: Evaluates Alphafold predicted models, and extracts the best.
 
-36.3_build_final_mature_figure_manifests.py: Builds the manifests used to generate the final structure-comparison figures.
+36.3_build_final_mature_figure_manifests.py: Builds manifest for final figure (outdated)
 
-The final structure figures themselves were generated using a separate consolidated figure-building workflow from the Stage-36 selected structures.
 
 37: Cluster_00121 neighborhood visualization
-37.1_plot_cluster00121_neighborhoods.R: Generates the initial gene-map visualization of representative Cluster_00121 neighborhoods.
+37.1_plot_cluster00121_neighborhoods.R: Plots the Cluster_00121 neighborhoods
 
-37.2_finalize_cluster00121_neighborhood_figure.R: Produces the final refined Cluster_00121 neighborhood figure.
+37.2_finalize_cluster00121_neighborhood_figure.R: Refines the cluster_00121 figures.
 
 38: Integrate MAGs into the Module 10 analysis
-38.1_build_module10_with_MAGs.R: Integrates relevant MAG Cyc2 loci with the existing GlobDB Module 10 architecture dataset.
+38.1_build_module10_with_MAGs.R: Integrates Methylumidiphilus MAGs into Cluster_00050 neighborhood figure.
 
-38.2_plot_module10_with_MAGs.R: Generates the combined GlobDB + MAG Module 10 gene-map figure.
+38.2_plot_module10_with_MAGs.R: Plots the Cluster_00050 neighborhood with MAGs.
 
-39: Cluster_00121 contextual QC
-39.1_check_cluster00121_local_context.R: Performs additional QC of the local genomic context surrounding Cluster_00121 proteins.
+39: Cluster_00121 vs Cluster_00050, analysis since Cluster_00050 shows up in cluster_00121 neighborhood.
+39.1_check_cluster00121_local_context.R: Checks for Cluster_00050 around cluster_00121.
 
-39.2_check_cluster00121_module10_links.R: Examines genomic relationships between Cluster_00121 proteins and Module 10-associated loci.
+39.2_check_cluster00121_module10_links.R: Checks links between cluster_00121 and cluster_00050 neighborhoods.
 
-40: Prepare the final species phylogeny
-40.1_download_umezawa_allocrenothrix_genomes.sh: Downloads two published Allocrenothrix methanica genomes included in the final phylogenetic analysis.
+40: Prepare  phylogeny
+40.1_download_umezawa_allocrenothrix_genomes.sh: Download Umezawa et al (2026) Allocrenothrix methanica genomes.
 
-40.2_prepare_final_species_tree_inputs.sh: Combines the 631 GlobDB Methylococcales genomes, 16 Methylococcales MAGs, two Allocrenothrix genomes and one Methylophaga outgroup into the final tree input set.
+40.2_prepare_final_species_tree_inputs.sh: Combine GlobDB genomes, MAGs, Allocrenothrix, and Methylophaga outgroup.
 
-41: Build the final bac120 species tree
-41.1_final_tree_gtdbtk_identify.sh: Identifies GTDB-Tk bac120 marker genes in the final genome collection.
+41: Build bac120 tree
+41.1_final_tree_gtdbtk_identify.sh: Identifies GTDB-Tk bac120 marker genes combined genomes.
 
-41.2_final_tree_gtdbtk_align.sh: Builds the concatenated bac120 marker alignment.
+41.2_final_tree_gtdbtk_align.sh: Builds bac120 multiple sequence alignment.
 
-41.3_final_tree_fasttree.sh: Infers the final species tree from the bac120 alignment using FastTree.
+41.3_final_tree_fasttree.sh: Create phylogeny with FastTree.
 
-41.4_root_final_species_tree.R: Roots the final species tree using the Methylophaga outgroup.
+41.4_root_final_species_tree.R: Roots phylogeny on Methylophaga outgroup.
 
 42: Additional quality and MCA0421 annotation
-42.1_checkm2_umezawa_genomes.sh: Runs CheckM2 on the two Allocrenothrix genomes to obtain quality metrics comparable with the MAGs.
+42.1_checkm2_umezawa_genomes.sh: Runs CheckM2 on Umezawa et al. (2026) reference genomes.
 
-42.2_check_MCA0421_umezawa.sh: Screens the Allocrenothrix genomes for MCA0421-family homologues.
+42.2_check_MCA0421_umezawa.sh: Screens Umezawa et al. (2026) reference genomes for MCA0421-family homologues.
 
 43: Build final species-tree metadata
-43_build_final_tree_metadata.R: Creates the metadata table used to annotate all tips in the final species tree.
+43_build_final_tree_metadata.R: Creates table with all metadata needed for tree.
 
 44: Plot the annotated species tree
-44_plot_final_tree_MCA0421_quality_refined.R: Generates the refined species tree showing Cyc2 family origin, Module 20 proteins, MCA0421-family homologues, genome completeness, contamination and taxonomic labels.
+44_plot_final_tree_MCA0421_quality_refined.R: Plots the phylogeny with all information implemented.
 
 45: Plot MAG tree
-45_plot_MAG_tree.R Generates phylogeny from the same alignment as previously, however, only MAGs and reference genomes are included. MMO and estimated completeness and contamination are shown.
+45_plot_MAG_tree.R Plots MAG phylogeny with all MMO track, and estimated completeness and contamination implemented.
 
 46: Make MAG appendix
 46_make_MAG_appendix.R: Produces a .docx with a table of all MAGs, their information and statistics.
